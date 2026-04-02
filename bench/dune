@@ -2,3 +2,7 @@
  (name bench)
  (libraries types_ours types_theirs visitorsRuntime upstream_visitors_runtime
             bechamel))
+
+(executable
+ (name bench_functors)
+ (libraries types_ours functor_visitors bechamel))
