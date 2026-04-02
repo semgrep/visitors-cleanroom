@@ -13,6 +13,6 @@
  (description "A clean-room implementation of the VisitorsRuntime module from the visitors OCaml PPX deriver for generating visitor-pattern classes.")
  (depends
   (ocaml (>= 4.14))
-  (ppxlib (>= 0.22.0))
+  (ppxlib (and (>= 0.22.0) (< 0.36.0)))
   (ppx_deriving (>= 5.0))
   result))

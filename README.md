@@ -55,6 +55,16 @@ dune exec bench/bench.exe
 The PPX automatically links our clean-room `VisitorsRuntime` via
 `ppx_runtime_deps`.
 
+## ppxlib compatibility
+
+The upstream PPX submodule (`vendor/visitors/`, tag `20250212`) requires ppxlib
+< 0.36.0. ppxlib 0.36.0 added `Ptyp_open` to its public AST. The upstream
+visitors release `20251114` handles `Ptyp_open`, but requires ppxlib >= 0.36.0.
+To upgrade, bump both together:
+
+1. `cd vendor/visitors && git checkout 20251114`
+2. Change the ppxlib constraint in `dune-project` to `(>= 0.36.0)`.
+
 ## License
 
 The clean-room runtime (`lib/`) is licensed LGPL-2.1 with the OCaml
