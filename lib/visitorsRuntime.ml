@@ -1,3 +1,16 @@
+(* Copyright (C) 2026 Semgrep Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * version 2.1 as published by the Free Software Foundation, with the
+ * special exception on linking described in file LICENSE.
+ *
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the file
+ * LICENSE for more details.
+ *)
+
 (* Clean-room implementation of VisitorsRuntime.
    Written from the public API signature only.
 
@@ -13,11 +26,6 @@
      identity traversal case). *)
 
 (* ---------- Utilities ---------- *)
-
-(* Safety: Array.unsafe_get/unsafe_set are used throughout this file only
-   where bounds are already proven by an assert, Array.length check, or
-   for-loop bound.  All uses are tagged with nosemgrep to suppress the
-   ocamllint-unsafe rule. *)
 
 let array_equal eq a1 a2 =
   let n = Array.length a1 in

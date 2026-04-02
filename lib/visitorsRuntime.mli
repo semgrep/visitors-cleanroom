@@ -1,3 +1,16 @@
+(* Copyright (C) 2026 Semgrep Inc.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * version 2.1 as published by the Free Software Foundation, with the
+ * special exception on linking described in file LICENSE.
+ *
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the file
+ * LICENSE for more details.
+ *)
+
 (** Clean-room implementation of the VisitorsRuntime module.
     Provides base visitor classes for use with the visitors PPX deriver. *)
 
@@ -27,17 +40,29 @@ val wrap2 : ('a -> 'b -> 'c) -> 'a -> 'b -> bool
 
 (** {1 Monoid classes} *)
 
+(** Virtual base class for monoids.  Inherited by {!reduce},
+    {!mapreduce}, {!reduce2}, and {!mapreduce2} to provide the
+    [plus] and [zero] methods that those visitors use to combine
+    results.  Subclasses must supply concrete implementations.
+
+    The [plus] operation should be associative for predictable
+    behavior, though non-associative monoids are permitted (see
+    the notes on fold direction in the arity-1 section). *)
 class virtual ['s] monoid : object
   method private virtual plus : 's -> 's -> 's
   method private virtual zero : 's
 end
 
+(** Concrete monoid over [int] with [plus = (+)] and [zero = 0]. *)
 class ['a] addition_monoid : object
   constraint 'a = int
   method private plus : 'a -> 'a -> 'a
   method private zero : 'a
 end
 
+(** Concrete monoid over [unit] with [plus = fun () () -> ()] and
+    [zero = ()].  Useful for reduce visitors that only care about
+    side effects and discard the accumulated value. *)
 class ['a] unit_monoid : object
   constraint 'a = unit
   method private plus : 'a -> 'a -> 'a
@@ -283,6 +308,12 @@ class virtual ['self] mapreduce : object
   method private virtual zero : 's
 end
 
+(** Empty class, a placeholder for user-defined fold visitors.
+
+    No methods are provided because the library does not wish to fix
+    their types.  It is up to the user to inherit from a class that
+    defines appropriate methods.  {!map} is likely appropriate in many
+    situations. *)
 class ['self] fold : object end
 
 (** {1 Arity-2 visitor classes}
@@ -295,6 +326,18 @@ class ['self] fold : object end
     [mapreduce2#visit_list] must use a right fold, same as
     {!mapreduce}. *)
 
+(** Side-effecting simultaneous traversal of two structures.
+
+    Raises {!StructuralMismatch} when the two structures have
+    incompatible shapes (e.g., lists of different lengths, [Some]
+    vs. [None], [Ok] vs. [Error]).
+
+    For scalar types ([int], [bool], [float], [string], etc.), the
+    two values are compared with [<>] and {!StructuralMismatch} is
+    raised if they differ.
+
+    [visit_list] uses a recursive [self#visit_list] call so subclass
+    overrides are respected at each recursive step. *)
 class ['self] iter2 : object
   method private visit_array :
     'env 'a 'b.
@@ -328,6 +371,15 @@ class ['self] iter2 : object
   method private visit_unit : 'env. 'env -> unit -> unit -> unit
 end
 
+(** Structure-transforming simultaneous traversal of two structures.
+
+    Raises {!StructuralMismatch} when the two structures have
+    incompatible shapes.  For scalar types, the two values are
+    compared with [<>] and {!StructuralMismatch} is raised if they
+    differ; the first value is returned.
+
+    [visit_list] uses a recursive [self#visit_list] call so subclass
+    overrides are respected at each recursive step. *)
 class ['self] map2 : object
   method private visit_array :
     'env 'a 'b 'c.
@@ -364,6 +416,16 @@ class ['self] map2 : object
   method private visit_unit : 'env. 'env -> unit -> unit -> unit
 end
 
+(** Monoidal reduction over two structures simultaneously.  Subclasses
+    must provide [zero] and [plus].
+
+    Raises {!StructuralMismatch} when the two structures have
+    incompatible shapes.
+
+    Unlike {!reduce}, [reduce2] does {e not} expose an overridable
+    fold helper analogous to [list_fold_left].  The list fold is
+    implemented as a local recursive function; subclasses can override
+    [visit_list] itself but cannot intercept individual fold steps. *)
 class virtual ['self] reduce2 : object
   method private virtual plus : 's -> 's -> 's
   method private visit_array :
@@ -399,6 +461,16 @@ class virtual ['self] reduce2 : object
   method private virtual zero : 's
 end
 
+(** Simultaneous transform and monoidal accumulation over two
+    structures.  Each [visit_*] method returns a pair
+    [(transformed_value, accumulated_summary)].  Subclasses must
+    provide [zero] and [plus].
+
+    Raises {!StructuralMismatch} when the two structures have
+    incompatible shapes.
+
+    [visit_list] uses a {e right fold} via recursive [self#visit_list]
+    calls, same as {!mapreduce}. *)
 class virtual ['self] mapreduce2 : object
   method private virtual plus : 's -> 's -> 's
   method private visit_array :
@@ -443,4 +515,6 @@ class virtual ['self] mapreduce2 : object
   method private virtual zero : 's
 end
 
+(** Empty class, the arity-2 counterpart of {!fold}.  Same rationale:
+    no methods are provided; the user supplies them. *)
 class ['self] fold2 : object end
