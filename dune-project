@@ -14,5 +14,4 @@
  (depends
   (ocaml (>= 4.14))
   (ppxlib (and (>= 0.22.0) (< 0.36.0)))
-  (ppx_deriving (>= 5.0))
-  result))
+  (ppx_deriving (>= 5.0))))

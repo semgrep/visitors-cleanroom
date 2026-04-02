@@ -13,7 +13,6 @@ depends: [
   "ocaml" {>= "4.14"}
   "ppxlib" {>= "0.22.0" & < "0.36.0"}
   "ppx_deriving" {>= "5.0"}
-  "result"
   "odoc" {with-doc}
 ]
 build: [
