@@ -18,14 +18,27 @@ let rec raw_tree_gen depth =
   else
     QCheck.oneof_weighted [
       (1, QCheck.always RLeaf);
+      (* Balanced: both children at depth-1 *)
       (2, QCheck.map (fun (l, v, r) -> RNode (l, v, r))
             (QCheck.triple
               (raw_tree_gen (depth - 1))
               QCheck.int_small
               (raw_tree_gen (depth - 1))));
+      (* Left-skewed: deep left, shallow right *)
+      (1, QCheck.map (fun (l, v) -> RNode (l, v, RLeaf))
+            (QCheck.pair
+              (raw_tree_gen (depth - 1))
+              QCheck.int_small));
+      (* Right-skewed: shallow left, deep right *)
+      (1, QCheck.map (fun (v, r) -> RNode (RLeaf, v, r))
+            (QCheck.pair
+              QCheck.int_small
+              (raw_tree_gen (depth - 1))));
     ]
 
-let tree_gen = raw_tree_gen 4
+(* Vary depth for more shape diversity *)
+let tree_gen =
+  QCheck.make QCheck.Gen.(int_range 0 5 >>= fun d -> QCheck.gen (raw_tree_gen d))
 
 let rec to_ours_tree = function
   | RLeaf -> O.Leaf
@@ -102,8 +115,10 @@ and raw_stmt_gen depth =
       (1, QCheck.map (fun e -> RReturn e) (raw_expr_gen (depth - 1)));
     ]
 
-let expr_gen = raw_expr_gen 3
-let stmt_gen = raw_stmt_gen 3
+let expr_gen =
+  QCheck.make QCheck.Gen.(int_range 0 4 >>= fun d -> QCheck.gen (raw_expr_gen d))
+let stmt_gen =
+  QCheck.make QCheck.Gen.(int_range 0 4 >>= fun d -> QCheck.gen (raw_stmt_gen d))
 
 let rec to_ours_expr = function
   | RLit i -> O.Lit i
@@ -692,6 +707,192 @@ let test_reduce2_tree =
        ours_res = theirs_res)
 
 (* ------------------------------------------------------------------ *)
+(* color: enum type (nullary constructors)                             *)
+(* ------------------------------------------------------------------ *)
+
+type raw_color = RRed | RGreen | RBlue
+
+let color_gen =
+  QCheck.make (QCheck.Gen.oneof_list [RRed; RGreen; RBlue])
+
+let to_ours_color = function
+  | RRed -> O.Red | RGreen -> O.Green | RBlue -> O.Blue
+let to_theirs_color = function
+  | RRed -> T.Red | RGreen -> T.Green | RBlue -> T.Blue
+
+let test_iter_color =
+  QCheck.Test.make ~name:"iter color: side effects agree"
+    ~count:200
+    color_gen
+    (fun raw ->
+       let ours_acc = ref [] in
+       let theirs_acc = ref [] in
+       let o = object
+         inherit [_] O.color_iter
+         method! visit_Red _env = ours_acc := "red" :: !ours_acc
+         method! visit_Green _env = ours_acc := "green" :: !ours_acc
+         method! visit_Blue _env = ours_acc := "blue" :: !ours_acc
+       end in
+       let t = object
+         inherit [_] T.color_iter
+         method! visit_Red _env = theirs_acc := "red" :: !theirs_acc
+         method! visit_Green _env = theirs_acc := "green" :: !theirs_acc
+         method! visit_Blue _env = theirs_acc := "blue" :: !theirs_acc
+       end in
+       o#visit_color () (to_ours_color raw);
+       t#visit_color () (to_theirs_color raw);
+       !ours_acc = !theirs_acc)
+
+let test_reduce_color =
+  QCheck.Test.make ~name:"reduce color: count agrees"
+    ~count:200
+    color_gen
+    (fun raw ->
+       let o = object
+         inherit [_] O.color_reduce
+         method private zero = 0
+         method private plus = ( + )
+         method! visit_Red _env = 1
+         method! visit_Green _env = 2
+         method! visit_Blue _env = 3
+       end in
+       let t = object
+         inherit [_] T.color_reduce
+         method private zero = 0
+         method private plus = ( + )
+         method! visit_Red _env = 1
+         method! visit_Green _env = 2
+         method! visit_Blue _env = 3
+       end in
+       o#visit_color () (to_ours_color raw)
+       = t#visit_color () (to_theirs_color raw))
+
+(* ------------------------------------------------------------------ *)
+(* point: tuple type                                                   *)
+(* ------------------------------------------------------------------ *)
+
+let point_gen = QCheck.triple QCheck.int_small QCheck.int_small QCheck.int_small
+
+let test_iter_point =
+  QCheck.Test.make ~name:"iter point: side effects agree"
+    ~count:300
+    point_gen
+    (fun (x, y, z) ->
+       let ours_acc = ref [] in
+       let theirs_acc = ref [] in
+       let o = object
+         inherit [_] O.point_iter
+         method! visit_int _env i = ours_acc := i :: !ours_acc
+       end in
+       let t = object
+         inherit [_] T.point_iter
+         method! visit_int _env i = theirs_acc := i :: !theirs_acc
+       end in
+       o#visit_point () (x, y, z);
+       t#visit_point () (x, y, z);
+       !ours_acc = !theirs_acc)
+
+let test_map_point =
+  QCheck.Test.make ~name:"map point: transform agrees"
+    ~count:300
+    point_gen
+    (fun (x, y, z) ->
+       let o = object
+         inherit [_] O.point_map
+         method! visit_int _env i = i * 2
+       end in
+       let t = object
+         inherit [_] T.point_map
+         method! visit_int _env i = i * 2
+       end in
+       o#visit_point () (x, y, z)
+       = t#visit_point () (x, y, z))
+
+let test_reduce_point =
+  QCheck.Test.make ~name:"reduce point: sum agrees"
+    ~count:300
+    point_gen
+    (fun (x, y, z) ->
+       let o = object
+         inherit [_] O.point_reduce
+         method private zero = 0
+         method private plus = ( + )
+       end in
+       let t = object
+         inherit [_] T.point_reduce
+         method private zero = 0
+         method private plus = ( + )
+       end in
+       o#visit_point () (x, y, z)
+       = t#visit_point () (x, y, z))
+
+(* ------------------------------------------------------------------ *)
+(* endo: partial change (some nodes change, some don't)                *)
+(* ------------------------------------------------------------------ *)
+
+let test_endo_tree_partial =
+  QCheck.Test.make ~name:"endo tree: partial change agrees"
+    ~count:500
+    tree_gen
+    (fun raw ->
+       (* Only change even values *)
+       let o = object
+         inherit [_] O.tree_endo
+         method visit_'a _env x = if x mod 2 = 0 then x + 1 else x
+       end in
+       let t = object
+         inherit [_] T.tree_endo
+         method visit_'a _env x = if x mod 2 = 0 then x + 1 else x
+       end in
+       ours_tree_to_raw (o#visit_tree () (to_ours_tree raw))
+       = theirs_tree_to_raw (t#visit_tree () (to_theirs_tree raw)))
+
+let test_endo_tree_partial_sharing =
+  QCheck.Test.make ~name:"endo tree: partial change sharing agrees"
+    ~count:500
+    tree_gen
+    (fun raw ->
+       let ot = to_ours_tree raw in
+       let tt = to_theirs_tree raw in
+       let o = object
+         inherit [_] O.tree_endo
+         method visit_'a _env x = if x mod 2 = 0 then x + 1 else x
+       end in
+       let t = object
+         inherit [_] T.tree_endo
+         method visit_'a _env x = if x mod 2 = 0 then x + 1 else x
+       end in
+       let ot' = o#visit_tree () ot in
+       let tt' = t#visit_tree () tt in
+       (* Both should agree on whether the root was physically preserved *)
+       (ot' == ot) = (tt' == tt))
+
+(* ------------------------------------------------------------------ *)
+(* mapreduce2: split non-assoc test into same-length and diff-length   *)
+(* ------------------------------------------------------------------ *)
+
+let test_mapreduce_tree_nonassoc_same_shape =
+  QCheck.Test.make ~name:"mapreduce tree: non-assoc monoid same-shape agrees"
+    ~count:500
+    tree_gen
+    (fun raw ->
+       let o = object
+         inherit [_] O.tree_mapreduce
+         method private zero = 0
+         method private plus a b = a - b
+         method visit_'a _env x = (x, x)
+       end in
+       let t = object
+         inherit [_] T.tree_mapreduce
+         method private zero = 0
+         method private plus a b = a - b
+         method visit_'a _env x = (x, x)
+       end in
+       let (ot, os) = o#visit_tree () (to_ours_tree raw) in
+       let (tt, ts) = t#visit_tree () (to_theirs_tree raw) in
+       ours_tree_to_raw ot = theirs_tree_to_raw tt && os = ts)
+
+(* ------------------------------------------------------------------ *)
 (* Run all tests                                                       *)
 (* ------------------------------------------------------------------ *)
 
@@ -703,6 +904,8 @@ let () =
       QCheck_alcotest.to_alcotest test_iter_expr;
       QCheck_alcotest.to_alcotest test_iter_stmt;
       QCheck_alcotest.to_alcotest test_iter_tree_with_env;
+      QCheck_alcotest.to_alcotest test_iter_color;
+      QCheck_alcotest.to_alcotest test_iter_point;
     ];
     "map traversal", [
       QCheck_alcotest.to_alcotest test_map_tree;
@@ -710,11 +913,14 @@ let () =
       QCheck_alcotest.to_alcotest test_map_expr_rename;
       QCheck_alcotest.to_alcotest test_map_stmt;
       QCheck_alcotest.to_alcotest test_map_person;
+      QCheck_alcotest.to_alcotest test_map_point;
     ];
     "endo traversal", [
       QCheck_alcotest.to_alcotest test_endo_tree_identity;
       QCheck_alcotest.to_alcotest test_endo_tree_change;
       QCheck_alcotest.to_alcotest test_endo_expr_identity;
+      QCheck_alcotest.to_alcotest test_endo_tree_partial;
+      QCheck_alcotest.to_alcotest test_endo_tree_partial_sharing;
     ];
     "reduce traversal", [
       QCheck_alcotest.to_alcotest test_reduce_tree_sum;
@@ -722,10 +928,13 @@ let () =
       QCheck_alcotest.to_alcotest test_reduce_expr_count_lits;
       QCheck_alcotest.to_alcotest test_reduce_expr_collect_vars;
       QCheck_alcotest.to_alcotest test_reduce_person;
+      QCheck_alcotest.to_alcotest test_reduce_color;
+      QCheck_alcotest.to_alcotest test_reduce_point;
     ];
     "mapreduce traversal", [
       QCheck_alcotest.to_alcotest test_mapreduce_tree;
       QCheck_alcotest.to_alcotest test_mapreduce_tree_nonassoc;
+      QCheck_alcotest.to_alcotest test_mapreduce_tree_nonassoc_same_shape;
       QCheck_alcotest.to_alcotest test_mapreduce_expr;
     ];
     "iter2 traversal", [

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ocaml-compiler: ['5.3']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Install dependencies
+        run: |
+          opam install . --deps-only --with-test
+          opam install visitors qcheck-core qcheck-alcotest alcotest bechamel
+
+      - name: Build
+        run: opam exec -- dune build
+
+      - name: Build (package mode)
+        run: opam exec -- dune build -p visitors-cleanroom
+
+      - name: Test
+        run: opam exec -- dune test --force

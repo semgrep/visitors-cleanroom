@@ -41,8 +41,13 @@ results unconditionally.
 
 ```sh
 opam install bechamel
-dune exec bench/bench.exe
+dune exec bench/bench.exe          # OO visitor benchmarks + stack depth conformance
+dune exec bench/bench_functors.exe # functor-based visitor benchmarks
 ```
+
+`bench_functors` compares PPX-generated OO visitors against hand-written
+functor-based visitors on the same types, measuring the overhead of
+virtual dispatch vs. static functor application.
 
 ## Usage
 

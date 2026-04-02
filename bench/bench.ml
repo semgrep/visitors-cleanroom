@@ -155,8 +155,8 @@ let benchmarks = Test.make_grouped ~name:"VisitorsRuntime" [
 (* ------------------------------------------------------------------ *)
 
 let test_stack_depth () =
-  Printf.printf "\n--- Stack depth conformance (200k element list) ---\n";
-  let big_list = make_list 200_000 in
+  Printf.printf "\n--- Stack depth conformance (8M element list) ---\n";
+  let big_list = make_list 8_000_000 in
   let test name ours_fn theirs_fn =
     let ours_ok = (try ours_fn big_list; true with Stack_overflow -> false) in
     let theirs_ok = (try theirs_fn big_list; true with Stack_overflow -> false) in
