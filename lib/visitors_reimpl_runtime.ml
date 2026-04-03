@@ -373,7 +373,7 @@ class virtual ['self] mapreduce = object (self)
             Array.unsafe_set r i y; (* nosemgrep: ocaml.lang.security.unsafe.ocamllint-unsafe *)
             loop (plus acc s) (i + 1)
         in
-        loop s0 1
+        loop (plus self#zero s0) 1
       end
 
   method private visit_bool : 'env. 'env -> bool -> bool * 's

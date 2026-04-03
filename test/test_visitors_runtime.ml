@@ -1,7 +1,7 @@
 (* Property-based tests comparing our clean-room VisitorsRuntime against
    the upstream visitors.runtime. *)
 
-module Ours = VisitorsRuntime
+module Ours = Visitors_reimpl_runtime
 module Theirs = Upstream_visitors_runtime
 
 (* ------------------------------------------------------------------ *)

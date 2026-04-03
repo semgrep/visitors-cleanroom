@@ -81,7 +81,7 @@ let ours_expr_iter = object inherit [_] O.expr_iter end
 let theirs_expr_iter = object inherit [_] T.expr_iter end
 
 class ours_map_list = object
-  inherit [_] VisitorsRuntime.map as super
+  inherit [_] Visitors_reimpl_runtime.map as super
   method list_ (f : unit -> int -> int) xs = super#visit_list f () xs
 end
 class theirs_map_list = object
@@ -169,7 +169,7 @@ let test_stack_depth () =
     (fun xs -> ignore ((new ours_map_list)#list_ (fun () x -> x) xs))
     (fun xs -> ignore ((new theirs_map_list)#list_ (fun () x -> x) xs));
   let ours_mr = object
-    inherit [_] VisitorsRuntime.mapreduce as super
+    inherit [_] Visitors_reimpl_runtime.mapreduce as super
     method private zero = 0
     method private plus = ( + )
     method list_ (f : unit -> int -> int * int) xs = super#visit_list f () xs

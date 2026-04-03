@@ -621,7 +621,7 @@ let test_iter2_tree_same =
        end in
        let ours_ok =
          (try o#visit_tree () ot ot; true
-          with VisitorsRuntime.StructuralMismatch -> false) in
+          with Visitors_reimpl_runtime.StructuralMismatch -> false) in
        let theirs_ok =
          (try t#visit_tree () tt tt; true
           with Upstream_visitors_runtime.StructuralMismatch -> false) in
@@ -634,7 +634,7 @@ let test_iter2_tree_different =
     (fun (raw1, raw2) ->
        let o = object
          inherit [_] O.tree_iter2
-         method visit_'a _env a b = if a <> b then raise VisitorsRuntime.StructuralMismatch
+         method visit_'a _env a b = if a <> b then raise Visitors_reimpl_runtime.StructuralMismatch
        end in
        let t = object
          inherit [_] T.tree_iter2
@@ -642,7 +642,7 @@ let test_iter2_tree_different =
        end in
        let ours_ok =
          (try o#visit_tree () (to_ours_tree raw1) (to_ours_tree raw2); true
-          with VisitorsRuntime.StructuralMismatch -> false) in
+          with Visitors_reimpl_runtime.StructuralMismatch -> false) in
        let theirs_ok =
          (try t#visit_tree () (to_theirs_tree raw1) (to_theirs_tree raw2); true
           with Upstream_visitors_runtime.StructuralMismatch -> false) in
@@ -669,7 +669,7 @@ let test_map2_tree =
        let tt = to_theirs_tree raw in
        let ours_res =
          (try Some (ours_tree_to_raw (o#visit_tree () ot ot))
-          with VisitorsRuntime.StructuralMismatch -> None) in
+          with Visitors_reimpl_runtime.StructuralMismatch -> None) in
        let theirs_res =
          (try Some (theirs_tree_to_raw (t#visit_tree () tt tt))
           with Upstream_visitors_runtime.StructuralMismatch -> None) in
@@ -700,7 +700,7 @@ let test_reduce2_tree =
        let tt = to_theirs_tree raw in
        let ours_res =
          (try Some (o#visit_tree () ot ot)
-          with VisitorsRuntime.StructuralMismatch -> None) in
+          with Visitors_reimpl_runtime.StructuralMismatch -> None) in
        let theirs_res =
          (try Some (t#visit_tree () tt tt)
           with Upstream_visitors_runtime.StructuralMismatch -> None) in

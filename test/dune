@@ -1,7 +1,7 @@
 (test
  (name test_visitors_runtime)
- (libraries visitorsRuntime upstream_visitors_runtime qcheck-core qcheck-alcotest alcotest))
+ (libraries visitors_reimpl_runtime upstream_visitors_runtime qcheck-core qcheck-alcotest alcotest))
 
 (test
  (name test_traversal)
- (libraries types_ours types_theirs visitorsRuntime upstream_visitors_runtime qcheck-core qcheck-alcotest alcotest))
+ (libraries types_ours types_theirs visitors_reimpl_runtime upstream_visitors_runtime qcheck-core qcheck-alcotest alcotest))

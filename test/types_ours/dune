@@ -1,4 +1,4 @@
 (library
  (name types_ours)
- (libraries visitorsRuntime)
+ (libraries visitors_reimpl_runtime)
  (preprocess (pps visitors.ppx)))

@@ -39,23 +39,32 @@ Key dune mechanics:
 
 ### Sub-libraries
 
-| Public name                | Directory | What it provides |
-|----------------------------|-----------|------------------|
-| `visitors-cleanroom`       | `lib/`    | `VisitorsRuntime` module (clean-room) |
-| `visitors-cleanroom.ppx`   | `ppx/`    | PPX deriver (upstream source, our runtime dep) |
+| Public name                  | Directory    | What it provides |
+|------------------------------|--------------|------------------|
+| `visitors-cleanroom`         | `lib/`       | `Visitors_reimpl_runtime` module (clean-room) |
+| `visitors-cleanroom.runtime` | `lib/alias/` | `VisitorsRuntime` alias (re-exports above) |
+| `visitors-cleanroom.ppx`     | `ppx/`       | PPX deriver (upstream source, our runtime dep) |
+
+The alias library exists because the upstream PPX hardcodes the module name
+`VisitorsRuntime` in generated code. The core implementation uses a distinct
+name (`Visitors_reimpl_runtime`) so that tests can link both our runtime and
+upstream's without module shadowing.
 
 ## Project layout
 
 ```
 lib/
-  visitorsRuntime.ml    -- clean-room runtime implementation
-  visitorsRuntime.mli   -- public interface with semantic contracts
-  dune                  -- public_name: visitors-cleanroom
+  visitors_reimpl_runtime.ml   -- clean-room runtime implementation
+  visitors_reimpl_runtime.mli  -- public interface with semantic contracts
+  dune                            -- public_name: visitors-cleanroom
+  alias/
+    visitorsRuntime.ml            -- include Visitors_reimpl_runtime
+    dune                          -- public_name: visitors-cleanroom.runtime
 
 ppx/
   dune                  -- public_name: visitors-cleanroom.ppx
                         -- builds from vendor/visitors/src/*.ml via copy_files
-                        -- ppx_runtime_libraries: visitorsRuntime
+                        -- ppx_runtime_libraries: visitorsRuntime (alias)
 
 vendor/
   visitors/             -- git submodule (gitlab.inria.fr/fpottier/visitors)
@@ -63,10 +72,11 @@ vendor/
   dune                  -- (data_only_dirs visitors)
 
 test/
-  test_visitors_runtime.ml  -- 68 property-based tests: base class methods
-  test_traversal.ml         -- 24 property-based tests: PPX-generated traversals
+  test_visitors_runtime.ml  -- 118 property-based tests: base class methods
+  test_traversal.ml         -- 32 property-based tests: PPX-generated traversals
   test_types.ml             -- shared ADT definitions (symlinked into subdirs)
   types_ours/               -- compiles test_types.ml linking our runtime
+    visitorsRuntime.ml      -- local bridge: include Visitors_reimpl_runtime
   types_theirs/             -- compiles test_types.ml linking upstream runtime
   upstream/                 -- re-exports upstream VisitorsRuntime as
                                Upstream_visitors_runtime to avoid name collisions
@@ -89,7 +99,9 @@ bench/
 Tests compare our runtime against upstream on random inputs using QCheck. The
 same `test_types.ml` source is compiled twice:
 
-- `types_ours` links against `visitorsRuntime` (our runtime)
+- `types_ours` links against `visitors_reimpl_runtime` (our runtime).
+  A local `visitorsRuntime.ml` bridge (`include Visitors_reimpl_runtime`)
+  ensures PPX-generated `VisitorsRuntime.*` references resolve to our code.
 - `types_theirs` links against `visitors.runtime` (upstream)
 
 Both use `visitors.ppx` for code generation. The test runner instantiates
@@ -98,6 +110,10 @@ visitors from both and asserts identical behavior.
 `upstream/upstream_visitors_runtime.ml` is `include VisitorsRuntime` -- it
 re-exports the upstream module under a distinct name so test code can reference
 both runtimes without ambiguity.
+
+The distinct module name `Visitors_reimpl_runtime` is critical for test
+correctness. Previously, both our library and upstream exposed `VisitorsRuntime`,
+causing module shadowing: tests compared upstream against itself, masking bugs.
 
 ## Implementation contracts
 
@@ -117,8 +133,9 @@ if modifying the runtime:
 - `array_equal` asserts equal length rather than returning false.
 - Arity-2 `visit_float` with NaN raises `StructuralMismatch`.
 
-If, on subsequent changes, your integration tests discover a mismatch in 
-behaviour between the 
+If, on subsequent changes, your integration tests discover a mismatch in
+behaviour between our runtime and upstream, fix the clean-room implementation
+to match upstream's semantics.
 
 ## Integration with other projects
 
